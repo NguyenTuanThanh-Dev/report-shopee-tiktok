@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phần mềm Tính Doanh Số Shopee - VQF</title>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <style>
+    /* Reset & cơ bản */
+    * {
+      box-sizing: border-box;
+    }
+    body, html {
+      margin: 0; padding: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      background: #f5f7fa;
+    }
+
+    /* Menu trái */
+    #sidebar {
+      width: 250px;
+      background-color: #004080;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.3s ease;
+    }
+    #sidebar.collapsed {
+      width: 60px;
+    }
+    #sidebar .logo {
+      padding: 20px;
+      font-weight: bold;
+      font-size: 24px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      user-select: none;
+    }
+    #sidebar.collapsed .logo {
+      font-size: 18px;
+      padding: 20px 10px;
+    }
+
+    /* Menu item */
+    #sidebar nav {
+      flex: 1;
+      padding: 10px 0;
+    }
+    #sidebar nav button {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 18px;
+      padding: 15px 20px;
+      text-align: left;
+      cursor: pointer;
+      border-left: 4px solid transparent;
+      transition: background-color 0.2s, border-left-color 0.2s;
+    }
+    #sidebar nav button:hover,
+    #sidebar nav button.active {
+      background-color: #0059b3;
+      border-left-color: #ffd700;
+    }
+    #sidebar.collapsed nav button span.text {
+      display: none;
+    }
+
+    /* Toggle button */
+    #toggleSidebar {
+      background: #003366;
+      color: white;
+      border: none;
+      cursor: pointer;
+      padding: 10px;
+      font-size: 20px;
+      user-select: none;
+      border-top: 1px solid rgba(255,255,255,0.3);
+    }
+    #sidebar.collapsed #toggleSidebar {
+      text-align: center;
+      font-size: 24px;
+      padding: 10px 0;
+    }
+
+    /* Main content */
+    #mainContent {
+      flex: 1;
+      padding: 25px 40px;
+      overflow-y: auto;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      color: #003366;
+    }
+
+    label {
+      font-weight: 600;
+      margin-right: 15px;
+    }
+
+    select, input[type="file"] {
+      font-size: 16px;
+      padding: 7px 10px;
+      margin-bottom: 15px;
+    }
+
+    button.import-btn {
+      margin-right: 10px;
+      padding: 10px 18px;
+      font-size: 16px;
+      background-color: #004080;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+    button.import-btn:hover {
+      background-color: #0059b3;
+    }
+
+    /* Bảng */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+      background: white;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background-color: #004080;
+      color: white;
+      user-select: none;
+    }
+    tbody tr:hover {
+      background-color: #f0f7ff;
+    }
+
+    /* Bảng hiển thị đầy đủ tất cả dữ liệu */
+    #mainContent > div.table-container {
+      margin-bottom: 30px;
+      border-radius: 6px;
+      box-shadow: inset 0 0 8px #ddd;
+    }
+
+    /* Toast message */
+    #toastContainer {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 300px;
+      z-index: 10000;
+      font-family: Arial, sans-serif;
+    }
+    .toast {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #4CAF50; /* mặc định thành công */
+      color: white;
+      padding: 15px 20px;
+      margin-top: 10px;
+      border-radius: 5px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      animation: slideIn 0.5s ease forwards;
+      user-select: none;
+    }
+    .toast.error {
+      background-color: #f44336;
+    }
+    .toast .close-btn {
+      cursor: pointer;
+      font-weight: bold;
+      margin-left: 15px;
+      font-size: 18px;
+      line-height: 18px;
+    }
+
+    @keyframes slideIn {
+      from {opacity: 0; transform: translateX(100%);}
+      to {opacity: 1; transform: translateX(0);}
+    }
+
+    /* Highlight bảng tổng hợp Tiktok */
+    #tiktokTotalSummaryTable tr, #tiktokTotalSummaryTable th, #tiktokTotalSummaryTable td {
+      background-color: #004080 !important;
+      color: white;
+    }
+    /* Highlight dòng duplicate Order ID trong bảng chi tiết Tiktok */
+    #tiktokSummaryTable tr.duplicate-order {
+      background-color: #FFB6C1 !important;
+    }
+  </style>
+</head>
+<body>
+
+  <aside id="sidebar">
+    <div class="logo">VQF</div>
+    <nav>
+      <button id="btnTinhDoanhSoShopee" class="active"><span class="text">Tính Doanh Số Shopee</span></button>
+      <button id="btnTinhDoanhThuTiktok"><span class="text">Tính Doanh số Tiktok</span></button>
+      <button id="btnDashboardAffTiktok"><span class="text">Dashboard AFF Tiktok</span></button>
+    </nav>
+    <button id="toggleSidebar" title="Ẩn/Hiện menu">⯈</button>
+  </aside>
+
+  <main id="mainContent">
+    <h1>Phần mềm Tính Doanh Số Shopee - VQF</h1>
+
+    <div id="tinhDoanhSoShopeeSection">
+      <label for="shopSelect">Chọn Shop:</label>
+      <select id="shopSelect">
+        <option value="Elwyn">Elwyn</option>
+        <option value="Melina">Melina</option>
+        <option value="caboxin.official">caboxin.official</option>
+        <option value="chipbongjp">chipbongjp</option>
+        <option value="dandongkhe">dandongkhe</option>
+        <option value="dungdungnguyen92.cg_hd">dungdungnguyen92.cg_hd</option>
+        <option value="genjeann">genjeann</option>
+        <option value="melajeans">melajeans</option>
+        <option value="tdfashion_vnxk">tdfashion_vnxk</option>
+        <option value="tdmen_vnxk">tdmen_vnxk</option>
+        <option value="thuyvoi">thuyvoi</option>
+        <option value="teemeejean">teemeejean</option>
+        <option value="trendjeanss">trendjeanss</option>
+        <option value="nhajean">nhajean</option>
+        <option value="lilianastoree">lilianastoree</option>
+        <option value="nirajean">nirajean</option>
+        <option value="jeantini">jeantini</option>
+        <option value="tdkiddo">tdkiddo</option>
+      </select>
+
+      <label for="loaiDonSelect" style="margin-left:30px;">Chọn Loại Đơn:</label>
+      <select id="loaiDonSelect">
+        <option value="Đơn thật">Đơn thật</option>
+        <option value="Đơn ảo">Đơn ảo</option>
+      </select>
+
+      <br />
+
+      <input type="file" id="fileInput" accept=".xls,.xlsx,.csv" />
+      <button class="import-btn" id="importBtn">Import Đơn</button>
+      <input type="file" id="affFileInput" accept=".xls,.xlsx,.csv" style="margin-left:20px;" />
+      <button class="import-btn" id="importAffBtn">Import AFF</button>
+      <button class="import-btn" id="debugBtn" style="margin-left:20px; background-color: #ff9800;">Debug Info</button>
+      <button class="import-btn" id="debugAffBtn" style="margin-left:20px; background-color: #e91e63;">Debug AFF</button>
+
+      <!-- Bảng tổng hợp -->
+      <h2 style="display:flex;align-items:center;gap:8px;">
+        Bảng Tính Tổng Hợp Doanh Số
+        <button id="toggleSummaryTable" style="background:none;border:none;font-size:20px;cursor:pointer;">▼</button>
+      </h2>
+      <div class="table-container" id="summaryTableContainer">
+        <table id="summaryTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Doanh số (Đơn thật)</th>
+              <th>Doanh số thực tế</th>
+              <th>Doanh số Hoàn/Hủy</th>
+              <th>Doanh số Đơn Hủy</th>
+              <th>Doanh số Đơn Hoàn</th>
+              <th>Tỷ lệ Hủy (%)</th>
+              <th>Tỷ lệ Hoàn (%)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Bảng Chi phí sàn -->
+      <h2 style="display:flex;align-items:center;gap:8px;">
+        Bảng Chi phí Sàn
+        <button id="togglePlatformCostTable" style="background:none;border:none;font-size:20px;cursor:pointer;">▼</button>
+      </h2>
+      <div class="table-container" id="platformCostTableContainer">
+        <table id="platformCostTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Số đơn hàng thực tế</th>
+              <th>Phí cố định</th>
+              <th>Phí dịch vụ</th>
+              <th>Phí thanh toán</th>
+              <th>Phí Pi Ship</th>
+              <th>Tổng Chi phí Sàn</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Bảng Chi phí tổng hợp -->
+      <h2 style="display:flex;align-items:center;gap:8px;">
+        Bảng Chi phí Tổng hợp
+        <button id="toggleCostSummaryTable" style="background:none;border:none;font-size:20px;cursor:pointer;">▼</button>
+      </h2>
+      <div class="table-container" id="costSummaryTableContainer">
+        <table id="costSummaryTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Mã giảm giá của Shop</th>
+              <th>Combo của Shop</th>
+              <th>Giảm giá Combo Ghép</th>
+              <th>Chi phí FLsale</th>
+              <th>Chi phí AFF</th>
+              <th>Tổng Chi phí</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Bảng danh sách đơn hàng -->
+      <h2 style="display:flex;align-items:center;gap:8px;">
+        Danh Sách Đơn Hàng
+        <button id="toggleOrdersTable" style="background:none;border:none;font-size:20px;cursor:pointer;">▼</button>
+      </h2>
+      <div style="margin-bottom:10px;" id="ordersTableFilterBar">
+        <label for="giaUuDaiFilter">Lọc theo Giá ưu đãi:</label>
+        <select id="giaUuDaiFilter"></select>
+        <input type="number" min="0" id="batchFlSaleInput" placeholder="Nhập Chi phí FLsale" style="width:120px; margin-left:10px;">
+        <button class="import-btn" id="applyBatchFlSaleBtn">Áp dụng hàng loạt</button>
+        <button class="import-btn" id="saveFlSaleBtn">Lưu Chi phí FLsale</button>
+      </div>
+      <div class="table-container" id="ordersTableContainer">
+        <table id="ordersTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAllOrders"></th>
+              <th>Shop</th>
+              <th>Mã Đơn Hàng</th>
+              <th>Mã Vận Đơn</th>
+              <th>Loại Đơn</th>
+              <th>Trạng Thái</th>
+              <th>Trạng Thái Trả hàng/Hoàn tiền</th>
+              <th>Giá ưu đãi</th>
+              <th>Doanh Số</th>
+              <th>Chi phí FLsale</th>
+              <th>Chi phí Combo ghép</th>
+            </tr>
+            <tr id="ordersTableSearchRow">
+              <th><input type="text" class="search-col" data-col="shop" style="width:90px"></th>
+              <th><input type="text" class="search-col" data-col="maDonHang" style="width:110px"></th>
+              <th><input type="text" class="search-col" data-col="maVanDon" style="width:110px"></th>
+              <th><input type="text" class="search-col" data-col="loaiDon" style="width:90px"></th>
+              <th><input type="text" class="search-col" data-col="trangThai" style="width:110px"></th>
+              <th><input type="text" class="search-col" data-col="trangThaiTraHangHoanTien" style="width:140px"></th>
+              <th><input type="text" class="search-col" data-col="giaUuDai" style="width:90px"></th>
+              <th><input type="text" class="search-col" data-col="doanhSo" style="width:90px"></th>
+              <th><input type="text" class="search-col" data-col="flSaleCost" style="width:90px"></th>
+              <th><input type="text" class="search-col" data-col="comboCost" style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <!-- Bảng dữ liệu AFF -->
+      <h2 style="margin-top:30px;">Bảng Dữ Liệu AFF</h2>
+      <div class="table-container" id="affTableContainer">
+        <table id="affTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Mã đơn hàng</th>
+              <th>Trạng thái đơn hàng</th>
+              <th>Trạng thái gian lận</th>
+              <th>Tài khoản Tiếp thị liên kết</th>
+              <th>MCN được liên kết</th>
+              <th>Kênh</th>
+              <th>Chi phí(₫)</th>
+              <th>Trạng thái khấu trừ</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+
+    </div>
+    <div id="tinhDoanhThuTiktokSection" style="display:none;">
+      <label for="shopSelectTiktok">Chọn Shop:</label>
+      <select id="shopSelectTiktok">
+        <option value="Elwyn">Elwyn</option>
+        <option value="Melina">Melina</option>
+        <option value="caboxin.official">caboxin.official</option>
+        <option value="chipbongjp">chipbongjp</option>
+        <option value="dandongkhe">dandongkhe</option>
+        <option value="dungdungnguyen92.cg_hd">dungdungnguyen92.cg_hd</option>
+        <option value="genjeann">genjeann</option>
+        <option value="melajeans">melajeans</option>
+        <option value="tdfashion_vnxk">tdfashion_vnxk</option>
+        <option value="tdmen_vnxk">tdmen_vnxk</option>
+        <option value="thuyvoi">thuyvoi</option>
+        <option value="teemeejean">teemeejean</option>
+        <option value="trendjeanss">trendjeanss</option>
+        <option value="nhajean">nhajean</option>
+        <option value="lilianastoree">lilianastoree</option>
+        <option value="nirajean">nirajean</option>
+        <option value="jeantini">jeantini</option>
+        <option value="tdkiddo">tdkiddo</option>
+      </select>
+      <label for="loaiDonSelectTiktok" style="margin-left:30px;">Chọn Loại Đơn:</label>
+      <select id="loaiDonSelectTiktok">
+        <option value="Đơn thật">Đơn thật</option>
+        <option value="Đơn ảo">Đơn ảo</option>
+      </select>
+      <br />
+      <input type="file" id="fileInputTiktok" accept=".xls,.xlsx,.csv" />
+      <button class="import-btn" id="importBtnTiktok">Import Đơn Tiktok</button>
+      <input type="file" id="affFileInputTiktok" accept=".xls,.xlsx,.csv" style="margin-left:20px;" />
+      <button class="import-btn" id="importAffBtnTiktok">Import AFF Tiktok</button>
+      <div class="table-container" id="tiktokSummaryTableContainer" style="margin-top:30px;">
+        <h2 style="margin-top:30px;">Bảng Tính Tổng Hợp Doanh Số</h2>
+        <table id="tiktokTotalSummaryTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Doanh số (Đơn thật)</th>
+              <th>Doanh số thực tế</th>
+              <th>Doanh số Hoàn/Hủy</th>
+              <th>Doanh số Đơn Hủy</th>
+              <th>Doanh số Đơn Hoàn</th>
+              <th>Tỷ lệ Hủy (%)</th>
+              <th>Tỷ lệ Hoàn (%)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <h2 style="margin-top:30px;">Bảng Chi phí Tổng hợp Tiktok</h2>
+        <table id="tiktokCostSummaryTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Tổng chi phí Combo ghép</th>
+              <th>Tổng chi phí AFF</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <h2 style="margin-top:30px;">Chi tiết đơn hàng Tiktok</h2>
+        <table id="tiktokSummaryTable">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Order ID</th>
+              <th>SKU sản phẩm</th>
+              <th>Trạng thái</th>
+              <th>Loại trả hàng/hủy</th>
+              <th>Giá</th>
+              <th>Giảm giá Tiktok</th>
+              <th>Giảm giá Shop</th>
+              <th>Doanh số</th>
+              <th>Chi phí Combo</th>
+              <th>Số tiền hoàn</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="table-container" id="tiktokAffTableContainer" style="margin-top:30px;">
+        <h2>Bảng Dữ Liệu AFF Tiktok</h2>
+        <table id="tiktokAffTable">
+          <thead>
+            <tr>
+              <th>Tên nhà sáng tạo</th>
+              <th>Loại nội dung</th>
+              <th>SKU người bán</th>
+              <th>Cơ sở hoa hồng ước tính</th>
+              <th>Thanh toán hoa hồng tiêu chuẩn ước tính</th>
+              <th>Thanh toán hoa hồng Quảng cáo cửa hàng ước tính</th>
+              <th>Chi phí AFF</th>
+              <th>Trạng thái đơn hàng</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="dashboardAffTiktokSection" style="display:none; margin-top:30px;">
+        <h1>Dashboard Affiliate Tiktok</h1>
+        <div id="dashboardAffTiktokSummaryCards" style="display:flex;gap:20px;margin-bottom:30px;">
+          <div class="summary-card" style="background:#007bff;color:white;padding:20px;border-radius:10px;flex:1;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:2em;">💰</span>
+            <div>
+              <div style="font-size:1.2em;font-weight:bold;">Tổng GMV</div>
+              <div id="dashboardAffTiktokTotalGMV" style="font-size:1.5em;">0₫</div>
+            </div>
+          </div>
+          <div class="summary-card" style="background:#ff9800;color:white;padding:20px;border-radius:10px;flex:1;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:2em;">💸</span>
+            <div>
+              <div style="font-size:1.2em;font-weight:bold;">Tổng AFF Cost</div>
+              <div id="dashboardAffTiktokTotalAffCost" style="font-size:1.5em;">0₫</div>
+            </div>
+          </div>
+          <div class="summary-card" style="background:#ffc107;color:#333;padding:20px;border-radius:10px;flex:1;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:2em;">📦</span>
+            <div>
+              <div style="font-size:1.2em;font-weight:bold;">Số đơn hàng</div>
+              <div id="dashboardAffTiktokTotalOrders" style="font-size:1.5em;">0</div>
+            </div>
+          </div>
+          <div class="summary-card" style="background:#f44336;color:white;padding:20px;border-radius:10px;flex:1;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:2em;">❌</span>
+            <div>
+              <div style="font-size:1.2em;font-weight:bold;">Tỷ lệ huỷ đơn</div>
+              <div id="dashboardAffTiktokCancelRate" style="font-size:1.5em;">0%</div>
+            </div>
+          </div>
+          <div class="summary-card" style="background:#9c27b0;color:white;padding:20px;border-radius:10px;flex:1;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:2em;">⚖️</span>
+            <div>
+              <div style="font-size:1.2em;font-weight:bold;">Tỷ lệ AFF/GMV</div>
+              <div id="dashboardAffTiktokAffGmvRate" style="font-size:1.5em;">0%</div>
+            </div>
+          </div>
+        </div>
+        <div class="table-container" id="dashboardAffTiktokSummaryTableContainer" style="margin-top:30px;">
+          <h2>Bảng tổng hợp theo nhà sáng tạo</h2>
+          <table id="dashboardAffTiktokSummaryTable">
+            <thead>
+              <tr>
+                <th>Nhà sáng tạo</th>
+                <th>Tổng GMV</th>
+                <th>Tổng AFF cost</th>
+                <th>Số đơn</th>
+                <th>% huỷ</th>
+                <th>Tỷ lệ AFF/GMV</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast messages container -->
+  <div id="toastContainer"></div>
+
+<script>
+  // --- Biến lưu trữ dữ liệu đơn hàng ---
+  // Lưu tất cả đơn hàng đã import, key: mã đơn hàng, value: đối tượng dữ liệu
+  const dataOrders = new Map();
+  // Lưu chi phí FLsale tạm thời trước khi lưu
+  const flSaleCosts = new Map();
+
+  // Các trạng thái hợp lệ (đơn thật và không bị hoàn trả)
+  const validOrderStatuses = [
+    "Chờ giao hàng",
+    "Đã giao",
+    "Đã nhận được hàng",
+    "Đang giao",
+    "Hoàn thành"
+  ];
+  // Regex trạng thái đặc biệt: chỉ cần chứa đoạn này là hợp lệ
+  const regexConfirmedReceived = /Người mua xác nhận đã nhận được hàng, tuy nhiên Người mua vẫn có thể gửi yêu cầu Trả hàng\/Hoàn tiền/;
+
+  // Trạng thái trả hàng/hoàn tiền loại bỏ
+  const rejectReturnStatuses = [
+    "Đã Chấp Thuận Yêu Cầu",
+    "Đã giải quyết khiếu nại",
+    "Hoàn tất trả hàng",
+    "Yêu cầu chờ xử lý"
+  ];
+
+  // Hàm hiển thị toast message
+  function showToast(message, type = "success") {
+    const container = document.getElementById("toastContainer");
+    const toast = document.createElement("div");
+    toast.classList.add("toast");
+    if(type === "error") toast.classList.add("error");
+    toast.innerHTML = `
+      <span>${message}</span>
+      <span class="close-btn" title="Đóng">&times;</span>
+    `;
+    container.appendChild(toast);
+
+    // Đóng khi click nút close
+    toast.querySelector(".close-btn").addEventListener("click", () => {
+      container.removeChild(toast);
+    });
+
+    // Tự ẩn sau 3s
+    setTimeout(() => {
+      if (container.contains(toast)) {
+        container.removeChild(toast);
+      }
+    }, 3000);
+  }
+
+  // Xử lý import file excel
+  document.getElementById("importBtn").addEventListener("click", () => {
+    // Không xóa dữ liệu cũ để có thể update/ghi đè theo mã đơn hàng
+    const fileInput = document.getElementById("fileInput");
+    if (!fileInput.files.length) {
+      showToast("Vui lòng chọn file Excel để import!", "error");
+      return;
+    }
+
+    const shop = document.getElementById("shopSelect").value;
+    const loaiDon = document.getElementById("loaiDonSelect").value;
+
+    const file = fileInput.files[0];
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:"array"});
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+
+        let newCount = 0;
+        let updateCount = 0;
+
+        // Duyệt dữ liệu file, xử lý theo yêu cầu
+        for (const row of jsonData) {
+          // Lấy các trường dữ liệu cần thiết
+          const maDonHang = String(row["Mã đơn hàng"] || "").trim();
+          if (!maDonHang) continue; // Bỏ dòng không có mã đơn
+
+          // Lấy dữ liệu trạng thái, kiểu chuỗi
+          const trangThai = String(row["Trạng Thái Đơn Hàng"] || "").trim();
+          const trangThaiTraHangHoanTien = String(row["Trạng thái Trả hàng/Hoàn tiền"] || "").trim();
+
+          // Tính doanh số đơn hàng theo công thức
+          let tongGiaTri = parseFloat(row["Tổng giá trị đơn hàng (VND)"] || 0);
+          let maGiamGiaShopee = parseFloat(row["Mã giảm giá của Shopee"] || 0);
+          let giamGiaComboShopee = parseFloat(row["Giảm giá từ combo Shopee"] || 0);
+          let shopeeXuHoan = parseFloat(row["Shopee Xu được hoàn"] || 0);
+          let doanhSo = loaiDon === "Đơn ảo" ? 0 : (tongGiaTri + maGiamGiaShopee + giamGiaComboShopee + shopeeXuHoan * 100);
+
+          // XÓA ĐI ĐIỀU KIỆN NÀY:
+          // if (["Đã Chấp Thuận Yêu Cầu", "Yêu cầu chờ xử lý", "Đã giải quyết khiếu nại"].includes(trangThaiTraHangHoanTien)) {
+          //   doanhSo = 0;
+          // }
+
+          const maVanDon = String(row["Mã vận đơn"] || "").trim();
+          const sku = String(row["SKU phân loại hàng"] || "");
+          let comboCost = getBundledProductCost(sku);
+
+          // Đối với đơn ảo, comboCost = 0
+          if (loaiDon === "Đơn ảo") {
+            comboCost = 0;
+          }
+
+          // Lấy giá ưu đãi trực tiếp từ cột "Giá ưu đãi" trong file excel
+          let giaUuDai = row["Giá ưu đãi"];
+
+          // Lấy thêm các trường cần thiết cho tính toán chi phí
+          let maGiamGiaShop = parseFloat(row["Mã giảm giá của Shop"] || 0);
+          let giamGiaComboShop = parseFloat(row["Giảm giá từ combo của Shop"] || 0);
+
+          // Đối với đơn ảo, các chi phí sẽ được set = 0
+          if (loaiDon === "Đơn ảo") {
+            maGiamGiaShop = 0;
+            giamGiaComboShop = 0;
+          }
+
+          // Hàm lấy giá trị cột bất kể hoa thường, dấu cách
+          function getColValue(row, ...possibleNames) {
+            for (const name of possibleNames) {
+              for (const key in row) {
+                if (key.replace(/\s+/g, '').toLowerCase() === name.replace(/\s+/g, '').toLowerCase()) {
+                  return row[key];
+                }
+              }
+            }
+            return 0;
+          }
+
+          // Lấy các phí từ Excel (linh hoạt tên cột)
+          let phiCoDinh = parseFloat(getColValue(row, "Phí cố định", "cố định") || 0);
+          let phiDichVu = parseFloat(getColValue(row, "Phí dịch vụ", "Phí Dịch Vụ") || 0);
+          let phiThanhToan = parseFloat(getColValue(row, "Phí thanh toán") || 0);
+
+          // Luôn ghi đè dữ liệu theo mã đơn hàng
+          dataOrders.set(maDonHang, {
+            shop,
+            maDonHang,
+            maVanDon,
+            loaiDon,
+            trangThai,
+            trangThaiTraHangHoanTien,
+            doanhSo,
+            comboCost,
+            giaUuDai,
+            maGiamGiaShop,
+            giamGiaComboShop,
+            maGiamGiaShopee,
+            giamGiaComboShopee,
+            phiCoDinh,
+            phiDichVu,
+            phiThanhToan
+          });
+          newCount++;
+        }
+
+        renderTables();
+        showToast(`Import thành công: ${newCount} đơn mới (loại bỏ ${jsonData.length - newCount} đơn trùng)`, "success");
+        // Reset file input để có thể import lại file giống hoặc khác
+        fileInput.value = "";
+
+      } catch (err) {
+        console.error(err);
+        showToast("Lỗi khi đọc file Excel. Vui lòng kiểm tra file và thử lại.", "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Biến lưu dữ liệu AFF
+  let affOrders = [];
+
+  // Xử lý import file AFF
+  document.getElementById("importAffBtn").addEventListener("click", () => {
+    const affFileInput = document.getElementById("affFileInput");
+    if (!affFileInput.files.length) {
+      showToast("Vui lòng chọn file AFF để import!", "error");
+      return;
+    }
+    const shop = document.getElementById("shopSelect").value;
+    const file = affFileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:"array"});
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+        // Hàm lấy giá trị cột linh hoạt
+        function getAffColValue(row, ...possibleNames) {
+          for (const name of possibleNames) {
+            for (const key in row) {
+              if (key.replace(/\s+/g, '').toLowerCase() === name.replace(/\s+/g, '').toLowerCase()) {
+                return row[key];
+              }
+            }
+          }
+          return null;
+        }
+        
+        // Map để cộng dồn chi phí và ghi đè dữ liệu mới nhất cho mỗi mã đơn hàng
+        const affOrderMap = new Map();
+        
+        // Debug: In ra thông tin file
+        console.log("=== DEBUG AFF IMPORT ===");
+        console.log(`Tổng số dòng trong file: ${jsonData.length}`);
+        console.log(`Shop đang chọn: ${shop}`);
+        
+        // Debug: In ra tên các cột trong file
+        if (jsonData.length > 0) {
+          console.log("Tên các cột trong file AFF:");
+          const firstRow = jsonData[0];
+          for (const key in firstRow) {
+            console.log(`  - "${key}": "${firstRow[key]}"`);
+          }
+        }
+        
+        for (const row of jsonData) {
+          // Lấy các trường cần thiết
+          const maDonHang = String(row["Mã đơn hàng"] || "").trim();
+          if (!maDonHang) continue; // Bỏ dòng không có mã đơn
+
+          const trangThaiDonHang = String(row["Trạng thái đơn hàng"] || "").trim();
+          const trangThaiGianLan = String(row["Trạng thái gian lận"] || "").trim();
+          const taiKhoanTTLK = String(row["Tài khoản Tiếp thị liên kết"] || "").trim();
+          const mcnDuocLienKet = String(row["MCN được liên kết"] || "").trim();
+          const kenh = String(row["Kênh"] || "").trim();
+          
+          const chiPhiRaw = getAffColValue(row, "Chi phí(₫)", "Chi phí", "Chi phí (₫)", "Chi phí(₫)") || row["Chi phí(₫)"];
+          const trangThaiKhauTru = String(getAffColValue(row, "Trạng thái khấu trừ", "Trạng thái khấu trừ") || row["Trạng thái khấu trừ"] || "").trim();
+
+          // Debug: In ra thông tin từng dòng
+          console.log(`Đơn hàng: ${maDonHang}`);
+          console.log(`  - Trạng thái khấu trừ: "${trangThaiKhauTru}"`);
+          console.log(`  - Chi phí raw: "${chiPhiRaw}" (type: ${typeof chiPhiRaw})`);
+
+          // Tính chi phí - SỬA LOGIC: Lấy trực tiếp từ cột Chi phí(₫) nếu có giá trị
+          let chiPhi = 0;
+          if (typeof chiPhiRaw === 'number' && chiPhiRaw > 0) {
+            chiPhi = chiPhiRaw;
+            console.log(`  - Chi phí tính được (number): ${chiPhi}`);
+          } else if (typeof chiPhiRaw === 'string' && chiPhiRaw !== '' && !isNaN(Number(chiPhiRaw.replace(/,/g, '')))) {
+            chiPhi = Number(chiPhiRaw.replace(/,/g, ''));
+            console.log(`  - Chi phí tính được (string): ${chiPhi}`);
+          } else {
+            console.log(`  - Chi phí raw không hợp lệ: "${chiPhiRaw}"`);
+          }
+
+          // Nếu mã đơn đã tồn tại thì cộng dồn chi phí và ghi đè thông tin mới nhất
+          if (affOrderMap.has(maDonHang)) {
+            const existingOrder = affOrderMap.get(maDonHang);
+            const oldChiPhi = existingOrder.chiPhi;
+            existingOrder.chiPhi += chiPhi;
+            console.log(`  - Cộng dồn: ${oldChiPhi} + ${chiPhi} = ${existingOrder.chiPhi}`);
+            // Ghi đè thông tin khác bằng dữ liệu mới nhất
+            existingOrder.trangThaiDonHang = trangThaiDonHang;
+            existingOrder.trangThaiGianLan = trangThaiGianLan;
+            existingOrder.taiKhoanTTLK = taiKhoanTTLK;
+            existingOrder.mcnDuocLienKet = mcnDuocLienKet;
+            existingOrder.kenh = kenh;
+            existingOrder.trangThaiKhauTru = trangThaiKhauTru;
+          } else {
+            // Nếu chưa có thì tạo mới
+            console.log(`  - Tạo mới đơn hàng với chi phí: ${chiPhi}`);
+            affOrderMap.set(maDonHang, {
+              shop,
+              maDonHang,
+              trangThaiDonHang,
+              trangThaiGianLan,
+              taiKhoanTTLK,
+              mcnDuocLienKet,
+              kenh,
+              chiPhi,
+              trangThaiKhauTru
+            });
+          }
+        }
+        
+        // Debug: In ra kết quả cuối cùng
+        console.log("=== KẾT QUẢ AFF IMPORT ===");
+        console.log(`Số đơn hàng AFF: ${affOrderMap.size}`);
+        let totalChiPhi = 0;
+        for (const [maDon, order] of affOrderMap.entries()) {
+          console.log(`  ${maDon}: ${order.chiPhi}`);
+          totalChiPhi += order.chiPhi;
+        }
+        console.log(`Tổng chi phí AFF: ${totalChiPhi}`);
+        
+        affOrders = Array.from(affOrderMap.values());
+        renderAffTable();
+        showToast(`Import AFF thành công: ${affOrders.length} dòng`, "success");
+        affFileInput.value = "";
+      } catch (err) {
+        console.error(err);
+        showToast("Lỗi khi đọc file AFF. Vui lòng kiểm tra file và thử lại.", "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // --- Biến lưu trữ dữ liệu Tiktok ---
+  const tiktokOrders = [];
+
+  // Xử lý import file excel Tiktok
+  document.getElementById("importBtnTiktok").addEventListener("click", () => {
+    const fileInput = document.getElementById("fileInputTiktok");
+    if (!fileInput.files.length) {
+      showToast("Vui lòng chọn file Excel Tiktok để import!", "error");
+      return;
+    }
+    const shop = document.getElementById("shopSelectTiktok").value;
+    const loaiDon = document.getElementById("loaiDonSelectTiktok").value;
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:"array"});
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+        // XÓA TOÀN BỘ DỮ LIỆU CŨ TRƯỚC KHI IMPORT
+        tiktokOrders.length = 0;
+        // Không kiểm tra trùng, không ghi đè, push tất cả các dòng vào mảng
+        for (const row of jsonData) {
+          const orderId = String(row["Order ID"] || "").trim();
+          if (!orderId) continue;
+          const orderStatus = String(row["Order Status"] || "").trim();
+          const returnType = String(row["Cancelation/Return Type"] || "").trim();
+          const sku = String(row["Seller SKU"] || "");
+          const productName = String(row["Product Name"] || "");
+          const price = parseFloat(row["SKU Subtotal After Discount"] || 0);
+          const tiktokDiscount = parseFloat(row["SKU Platform Discount"] || 0);
+          const shopDiscount = parseFloat(row["SKU Seller Discount"] || 0);
+          const refundAmount = parseFloat(row["Order Refund Amount"] || 0);
+          let doanhSo = 0;
+          if (loaiDon === "Đơn thật") {
+            doanhSo = price + tiktokDiscount;
+          }
+          if (loaiDon === "Đơn ảo") {
+            doanhSo = 0;
+          }
+          let comboCost = sku ? getBundledProductCostTiktok(sku) : 0;
+          if (loaiDon === "Đơn ảo") {
+            comboCost = 0;
+          }
+          const newOrder = {
+            shop,
+            orderId,
+            orderStatus,
+            returnType,
+            sku,
+            sellerSku: sku,
+            productName,
+            price,
+            tiktokDiscount,
+            shopDiscount,
+            doanhSo,
+            refundAmount,
+            loaiDon,
+            comboCost
+          };
+          tiktokOrders.push(newOrder);
+        }
+        // Sau khi cập nhật dữ liệu, luôn render lại bảng tổng hợp và chi tiết
+        renderTiktokTable();
+        showToast(`Import thành công: ${jsonData.length} dòng sản phẩm Tiktok!`, "success");
+        fileInput.value = "";
+      } catch (err) {
+        console.error(err);
+        showToast("Lỗi khi đọc file Excel Tiktok. Vui lòng kiểm tra file và thử lại.", "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  const formatVND = v => {
+    let num = typeof v === 'number' ? v : (typeof v === 'string' && v !== '' && !isNaN(Number(v.replace(/,/g, '')))) ? Number(v.replace(/,/g, '')) : null;
+    return num !== null ? num.toLocaleString('vi-VN', {style: 'currency', currency: 'VND', minimumFractionDigits: 0}) : v;
+  };
+
+  // Hàm format số thành VNĐ không có ký hiệu tiền tệ
+  const formatNumberVND = v => {
+    let num = typeof v === 'number' ? v : (typeof v === 'string' && v !== '' && !isNaN(Number(v.replace(/,/g, '')))) ? Number(v.replace(/,/g, '')) : null;
+    return num !== null ? num.toLocaleString('vi-VN') : v;
+  };
+
+  // Đổi filter Doanh số thành filter Giá ưu đãi
+  // Format cho filter dropdown
+  function renderGiaUuDaiFilter() {
+    const filter = document.getElementById("giaUuDaiFilter");
+    // Lưu lại giá trị filter hiện tại
+    const currentValue = filter.value;
+    const values = Array.from(dataOrders.values()).map(o => o.giaUuDai);
+    const unique = Array.from(new Set(values)).filter(v => v !== undefined && v !== '').sort((a,b) => Number(a)-Number(b));
+    filter.innerHTML = '<option value="">Tất cả</option>' + unique.map(v => `<option value="${v}">${formatVND(v)}</option>`).join("");
+    // Giữ lại giá trị filter hiện tại nếu còn tồn tại, nếu không thì về "Tất cả"
+    if (currentValue && unique.includes(currentValue)) {
+      filter.value = currentValue;
+    } else {
+      filter.value = "";
+    }
+  }
+
+  // Biến lưu filter từng cột
+  const ordersTableColFilters = {
+    shop: '',
+    maDonHang: '',
+    maVanDon: '',
+    loaiDon: '',
+    trangThai: '',
+    trangThaiTraHangHoanTien: '',
+    doanhSo: '',
+    flSaleCost: '',
+    comboCost: '',
+    giaUuDai: ''
+  };
+
+  // Hàm tính toán & render bảng
+  function renderTables() {
+    const summary = {}; // tổng hợp theo shop
+
+    // Tính toán theo từng đơn hàng
+    for (const order of dataOrders.values()) {
+      if (!summary[order.shop]) {
+        summary[order.shop] = {
+          tongDoanhSoDonThat: 0,
+          doanhSoThucTe: 0,
+          doanhSoHuy: 0,
+          doanhSoHoan: 0
+        };
+      }
+      const s = summary[order.shop];
+
+      // Đơn thật mới tính doanh số tổng
+      if (order.loaiDon === "Đơn thật") {
+        s.tongDoanhSoDonThat += order.doanhSo;
+      }
+
+      // Kiểm tra trạng thái đơn hợp lệ cho doanh số thực tế
+      const trangThaiHopLe = validOrderStatuses.includes(order.trangThai) || regexConfirmedReceived.test(order.trangThai);
+      const isTraHangHoanTien = rejectReturnStatuses.includes(order.trangThaiTraHangHoanTien);
+
+      // Đảm bảo các đơn có trạng thái khớp regex cũng được tính doanh số thực tế nếu không bị hoàn trả
+      if (order.loaiDon !== "Đơn ảo" && trangThaiHopLe && !isTraHangHoanTien) {
+        s.doanhSoThucTe += order.doanhSo;
+      }
+
+      // --- SỬA ĐOẠN NÀY: Phân biệt Shopee và Tiktok khi tính doanh số hủy/hoàn ---
+      if (order.loaiDon === "Đơn thật") {
+        // Nếu là đơn Shopee (không có orderStatus/returnType)
+        if (typeof order.orderStatus === 'undefined' && typeof order.returnType === 'undefined') {
+          // Đơn Hủy: trạng thái chứa "hủy"
+          if ((order.trangThai || "").toLowerCase().includes("hủy")) {
+            s.doanhSoHuy += order.doanhSo;
+          }
+          // Đơn Hoàn: trạng thái trả hàng/hoàn tiền nằm trong rejectReturnStatuses
+          else if (rejectReturnStatuses.includes(order.trangThaiTraHangHoanTien)) {
+            s.doanhSoHoan += order.doanhSo;
+          }
+        } else {
+          // Tiktok logic cũ giữ nguyên
+          if (normalizeStatus(order.orderStatus).includes("hủy")) {
+            s.doanhSoHuy += order.doanhSo;
+          } else if (order.returnType === "Return/Refund") {
+            s.doanhSoHoan += order.doanhSo;
+          }
+          if (order.refundAmount > 0 && !normalizeStatus(order.orderStatus).includes("hủy")) {
+            s.doanhSoHoan += order.refundAmount;
+          }
+        }
+      }
+    }
+
+    // Render bảng Tổng hợp
+    const tbodySummary = document.querySelector("#summaryTable tbody");
+    tbodySummary.innerHTML = "";
+    let totalSummary = {
+      tongDoanhSoDonThat: 0,
+      doanhSoThucTe: 0,
+      doanhSoHoanHuy: 0,
+      doanhSoHuy: 0,
+      doanhSoHoan: 0
+    };
+
+    for (const shop in summary) {
+      const s = summary[shop];
+      const doanhSoHoanHuy = s.tongDoanhSoDonThat - s.doanhSoThucTe;
+      const tyLeHuy = s.tongDoanhSoDonThat > 0 ? ((s.doanhSoHuy / s.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+      const tyLeHoan = s.tongDoanhSoDonThat > 0 ? ((s.doanhSoHoan / s.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+
+      // Cộng vào tổng
+      totalSummary.tongDoanhSoDonThat += s.tongDoanhSoDonThat;
+      totalSummary.doanhSoThucTe += s.doanhSoThucTe;
+      totalSummary.doanhSoHoanHuy += doanhSoHoanHuy;
+      totalSummary.doanhSoHuy += s.doanhSoHuy;
+      totalSummary.doanhSoHoan += s.doanhSoHoan;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${shop}</td>
+        <td>${formatVND(s.tongDoanhSoDonThat)}</td>
+        <td>${formatVND(s.doanhSoThucTe)}</td>
+        <td>${formatVND(doanhSoHoanHuy)}</td>
+        <td>${formatVND(s.doanhSoHuy)}</td>
+        <td>${formatVND(s.doanhSoHoan)}</td>
+        <td>${tyLeHuy}%</td>
+        <td>${tyLeHoan}%</td>
+      `;
+      tbodySummary.appendChild(tr);
+    }
+
+    // Thêm dòng tổng
+    const trTotalSummary = document.createElement("tr");
+    trTotalSummary.style.fontWeight = "bold";
+    trTotalSummary.style.backgroundColor = "#f0f0f0";
+    const tyLeHuyTotal = totalSummary.tongDoanhSoDonThat > 0 ? ((totalSummary.doanhSoHuy / totalSummary.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+    const tyLeHoanTotal = totalSummary.tongDoanhSoDonThat > 0 ? ((totalSummary.doanhSoHoan / totalSummary.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+    trTotalSummary.innerHTML = `
+      <td><strong>TỔNG</strong></td>
+      <td><strong>${formatVND(totalSummary.tongDoanhSoDonThat)}</strong></td>
+      <td><strong>${formatVND(totalSummary.doanhSoThucTe)}</strong></td>
+      <td><strong>${formatVND(totalSummary.doanhSoHoanHuy)}</strong></td>
+      <td><strong>${formatVND(totalSummary.doanhSoHuy)}</strong></td>
+      <td><strong>${formatVND(totalSummary.doanhSoHoan)}</strong></td>
+      <td><strong>${tyLeHuyTotal}%</strong></td>
+      <td><strong>${tyLeHoanTotal}%</strong></td>
+    `;
+    tbodySummary.appendChild(trTotalSummary);
+
+    // Render bảng Danh sách đơn hàng
+    const tbodyOrders = document.querySelector("#ordersTable tbody");
+    tbodyOrders.innerHTML = "";
+    const giaUuDaiFilter = document.getElementById("giaUuDaiFilter").value;
+    for (const order of dataOrders.values()) {
+      if (giaUuDaiFilter && order.giaUuDai != giaUuDaiFilter) continue;
+      // Lọc theo từng cột
+      if (ordersTableColFilters.shop && !order.shop.toLowerCase().includes(ordersTableColFilters.shop)) continue;
+      if (ordersTableColFilters.maDonHang && !order.maDonHang.toLowerCase().includes(ordersTableColFilters.maDonHang)) continue;
+      if (ordersTableColFilters.maVanDon && !order.maVanDon.toLowerCase().includes(ordersTableColFilters.maVanDon)) continue;
+      if (ordersTableColFilters.loaiDon && !order.loaiDon.toLowerCase().includes(ordersTableColFilters.loaiDon)) continue;
+      if (ordersTableColFilters.trangThai && !order.trangThai.toLowerCase().includes(ordersTableColFilters.trangThai)) continue;
+      if (ordersTableColFilters.trangThaiTraHangHoanTien && !order.trangThaiTraHangHoanTien.toLowerCase().includes(ordersTableColFilters.trangThaiTraHangHoanTien)) continue;
+      if (ordersTableColFilters.doanhSo && !order.doanhSo.toString().includes(ordersTableColFilters.doanhSo)) continue;
+      if (ordersTableColFilters.flSaleCost && !(typeof order.flSaleCost !== 'undefined' && order.flSaleCost.toString().includes(ordersTableColFilters.flSaleCost))) continue;
+      if (ordersTableColFilters.comboCost && !(typeof order.comboCost !== 'undefined' && order.comboCost.toString().includes(ordersTableColFilters.comboCost))) continue;
+      if (ordersTableColFilters.giaUuDai && !(typeof order.giaUuDai !== 'undefined' && order.giaUuDai.toString().includes(ordersTableColFilters.giaUuDai))) continue;
+      const formatNumber = v => formatNumberVND(v);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="checkbox" class="order-checkbox" data-madon="${order.maDonHang}"></td>
+        <td>${order.shop}</td>
+        <td>${order.maDonHang}</td>
+        <td>${order.maVanDon}</td>
+        <td>${order.loaiDon}</td>
+        <td>${order.trangThai}</td>
+        <td>${order.trangThaiTraHangHoanTien}</td>
+        <td>${order.giaUuDai !== undefined ? formatVND(order.giaUuDai) : ''}</td>
+        <td>${formatVND(order.doanhSo)}</td>
+        <td><input type="number" min="0" class="flsale-input" data-madon="${order.maDonHang}" value="${typeof order.flSaleCost !== 'undefined' ? order.flSaleCost : ''}" style="width:90px;"></td>
+        <td>${order.comboCost ? formatVND(order.comboCost) : ''}</td>
+      `;
+      tbodyOrders.appendChild(tr);
+    }
+    renderGiaUuDaiFilter();
+    renderCostTables();
+  }
+
+  // Hàm render bảng AFF
+function renderAffTable() {
+  const tbody = document.querySelector("#affTable tbody");
+  tbody.innerHTML = "";
+  for (const order of affOrders) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${order.shop}</td>
+      <td>${order.maDonHang}</td>
+      <td>${order.trangThaiDonHang}</td>
+      <td>${order.trangThaiGianLan}</td>
+      <td>${order.taiKhoanTTLK}</td>
+      <td>${order.mcnDuocLienKet}</td>
+      <td>${order.kenh}</td>
+      <td>${formatVND(order.chiPhi)}</td>
+      <td>${order.trangThaiKhauTru}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  renderCostTables();
+}
+
+  // Hàm render bảng chi phí tổng hợp và chi phí sàn
+function renderCostTables() {
+  // Tính toán chi phí tổng hợp theo shop
+  const costSummary = {};
+  const platformCost = {};
+
+  // Debug: Đếm tổng số đơn hàng
+  const totalOrders = dataOrders.size;
+  console.log(`Tổng số đơn hàng trong dataOrders: ${totalOrders}`);
+
+  // Khởi tạo dữ liệu cho từng shop
+  for (const order of dataOrders.values()) {
+    if (!costSummary[order.shop]) {
+      costSummary[order.shop] = {
+        maGiamGiaShop: 0,
+        giamGiaComboShop: 0,
+        giamGiaComboGhep: 0,
+        chiPhiFLsale: 0,
+        phiCoDinh: 0,
+        phiDichVu: 0,
+        phiThanhToan: 0,
+        totalOrders: 0,
+        validOrders: 0
+      };
+    }
+    if (!platformCost[order.shop]) {
+      platformCost[order.shop] = {
+        soDonThucTe: 0,
+        totalOrders: 0,
+        phiCoDinh: 0,
+        phiDichVu: 0,
+        phiThanhToan: 0
+      };
+    }
+
+    // Đếm tổng số đơn hàng theo shop
+    costSummary[order.shop].totalOrders++;
+    platformCost[order.shop].totalOrders++;
+
+    // Kiểm tra trạng thái đơn hàng có bị loại bỏ hay không
+    const trangThaiHopLe = validOrderStatuses.includes(order.trangThai) || regexConfirmedReceived.test(order.trangThai);
+    const isTraHangHoanTien = rejectReturnStatuses.includes(order.trangThaiTraHangHoanTien);
+    const isDonAo = order.loaiDon === "Đơn ảo";
+    
+    // Kiểm tra đơn hàng có bị loại bỏ hay không
+    const isOrderRejected = isDonAo || !trangThaiHopLe || isTraHangHoanTien;
+    
+    // Chỉ cộng dồn các chi phí nếu đơn hàng KHÔNG bị loại bỏ
+    if (!isOrderRejected) {
+      costSummary[order.shop].maGiamGiaShop += order.maGiamGiaShop || 0;
+      costSummary[order.shop].giamGiaComboShop += order.giamGiaComboShop || 0;
+      costSummary[order.shop].giamGiaComboGhep += order.comboCost || 0;
+      costSummary[order.shop].chiPhiFLsale += order.flSaleCost || 0;
+      
+      // Cộng dồn các phí từ Excel
+      costSummary[order.shop].phiCoDinh += order.phiCoDinh || 0;
+      costSummary[order.shop].phiDichVu += order.phiDichVu || 0;
+      costSummary[order.shop].phiThanhToan += order.phiThanhToan || 0;
+      platformCost[order.shop].phiCoDinh += order.phiCoDinh || 0;
+      platformCost[order.shop].phiDichVu += order.phiDichVu || 0;
+      platformCost[order.shop].phiThanhToan += order.phiThanhToan || 0;
+    }
+
+    // Đếm số đơn hàng thực tế (đơn hàng đáp ứng tiêu chí doanh số thực tế)
+
+    // Debug: In ra thông tin đơn hàng không hợp lệ
+    if (order.loaiDon === "Đơn ảo") {
+      console.log(`Đơn ảo bị loại: ${order.maDonHang} - ${order.shop}`);
+    } else if (!trangThaiHopLe) {
+      console.log(`Trạng thái không hợp lệ: ${order.maDonHang} - ${order.trangThai} - ${order.shop}`);
+    } else if (isTraHangHoanTien) {
+      console.log(`Bị hoàn trả: ${order.maDonHang} - ${order.trangThaiTraHangHoanTien} - ${order.shop}`);
+    } else {
+      costSummary[order.shop].validOrders++;
+    }
+
+    if (order.loaiDon !== "Đơn ảo" && trangThaiHopLe && !isTraHangHoanTien) {
+      platformCost[order.shop].soDonThucTe++;
+    }
+  }
+
+  // Debug: In ra thống kê theo shop
+  for (const shop in platformCost) {
+    console.log(`${shop}: Tổng ${platformCost[shop].totalOrders} đơn, Thực tế ${platformCost[shop].soDonThucTe} đơn`);
+  }
+
+  // Cộng chi phí AFF theo shop (chỉ cho các đơn hàng không bị loại bỏ)
+  console.log("=== DEBUG AFF COST CALCULATION ===");
+  console.log(`Tổng số đơn AFF: ${affOrders.length}`);
+  
+  for (const affOrder of affOrders) {
+    if (!costSummary[affOrder.shop]) {
+      costSummary[affOrder.shop] = {
+        maGiamGiaShop: 0,
+        giamGiaComboShop: 0,
+        giamGiaComboGhep: 0,
+        chiPhiFLsale: 0,
+        chiPhiAFF: 0,
+        phiCoDinh: 0,
+        phiDichVu: 0,
+        phiThanhToan: 0,
+        totalOrders: 0,
+        validOrders: 0
+      };
+    }
+    
+    // Tìm đơn hàng tương ứng trong dataOrders để kiểm tra trạng thái
+    const correspondingOrder = dataOrders.get(affOrder.maDonHang);
+    console.log(`AFF Order ${affOrder.maDonHang}:`);
+    console.log(`  - Chi phí AFF: ${affOrder.chiPhi}`);
+    console.log(`  - Shop: ${affOrder.shop}`);
+    
+    if (correspondingOrder) {
+      const trangThaiHopLe = validOrderStatuses.includes(correspondingOrder.trangThai) || regexConfirmedReceived.test(correspondingOrder.trangThai);
+      const isTraHangHoanTien = rejectReturnStatuses.includes(correspondingOrder.trangThaiTraHangHoanTien);
+      const isDonAo = correspondingOrder.loaiDon === "Đơn ảo";
+      const isOrderRejected = isDonAo || !trangThaiHopLe || isTraHangHoanTien;
+      
+      console.log(`  - Trạng thái hợp lệ: ${trangThaiHopLe}`);
+      console.log(`  - Bị hoàn trả: ${isTraHangHoanTien}`);
+      console.log(`  - Đơn ảo: ${isDonAo}`);
+      console.log(`  - Bị loại bỏ: ${isOrderRejected}`);
+      
+      // Chỉ cộng chi phí AFF nếu đơn hàng không bị loại bỏ
+      if (!isOrderRejected) {
+        const oldChiPhiAFF = costSummary[affOrder.shop].chiPhiAFF || 0;
+        costSummary[affOrder.shop].chiPhiAFF = oldChiPhiAFF + affOrder.chiPhi;
+        console.log(`  - Cộng vào chi phí AFF: ${oldChiPhiAFF} + ${affOrder.chiPhi} = ${costSummary[affOrder.shop].chiPhiAFF}`);
+      } else {
+        console.log(`  - BỎ QUA do đơn hàng bị loại bỏ`);
+      }
+    } else {
+      console.log(`  - KHÔNG TÌM THẤY đơn hàng tương ứng trong dataOrders`);
+      // SỬA LOGIC: Vẫn cộng chi phí AFF ngay cả khi không tìm thấy đơn hàng tương ứng
+      const oldChiPhiAFF = costSummary[affOrder.shop].chiPhiAFF || 0;
+      costSummary[affOrder.shop].chiPhiAFF = oldChiPhiAFF + affOrder.chiPhi;
+      console.log(`  - VẪN CỘNG chi phí AFF: ${oldChiPhiAFF} + ${affOrder.chiPhi} = ${costSummary[affOrder.shop].chiPhiAFF} (không tìm thấy đơn hàng tương ứng)`);
+    }
+  }
+
+  // Render bảng chi phí tổng hợp
+  const tbodyCostSummary = document.querySelector("#costSummaryTable tbody");
+  tbodyCostSummary.innerHTML = "";
+  let totalCostSummary = {
+    maGiamGiaShop: 0,
+    giamGiaComboShop: 0,
+    giamGiaComboGhep: 0,
+    chiPhiFLsale: 0,
+    chiPhiAFF: 0,
+    tongChiPhi: 0
+  };
+
+  for (const shop in costSummary) {
+    const cost = costSummary[shop];
+    const tongChiPhi = cost.maGiamGiaShop + cost.giamGiaComboShop + cost.giamGiaComboGhep + cost.chiPhiFLsale + cost.chiPhiAFF;
+
+    // Cộng vào tổng
+    totalCostSummary.maGiamGiaShop += cost.maGiamGiaShop;
+    totalCostSummary.giamGiaComboShop += cost.giamGiaComboShop;
+    totalCostSummary.giamGiaComboGhep += cost.giamGiaComboGhep;
+    totalCostSummary.chiPhiFLsale += cost.chiPhiFLsale;
+    totalCostSummary.chiPhiAFF += cost.chiPhiAFF;
+    totalCostSummary.tongChiPhi += tongChiPhi;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${shop}</td>
+      <td>${formatVND(cost.maGiamGiaShop)}</td>
+      <td>${formatVND(cost.giamGiaComboShop)}</td>
+      <td>${formatVND(cost.giamGiaComboGhep)}</td>
+      <td>${formatVND(cost.chiPhiFLsale)}</td>
+      <td>${formatVND(cost.chiPhiAFF)}</td>
+      <td>${formatVND(tongChiPhi)}</td>
+    `;
+    tbodyCostSummary.appendChild(tr);
+  }
+
+  // Thêm dòng tổng
+  const trTotal = document.createElement("tr");
+  trTotal.style.fontWeight = "bold";
+  trTotal.style.backgroundColor = "#f0f0f0";
+  trTotal.innerHTML = `
+    <td><strong>TỔNG</strong></td>
+    <td><strong>${formatVND(totalCostSummary.maGiamGiaShop)}</strong></td>
+    <td><strong>${formatVND(totalCostSummary.giamGiaComboShop)}</strong></td>
+    <td><strong>${formatVND(totalCostSummary.giamGiaComboGhep)}</strong></td>
+    <td><strong>${formatVND(totalCostSummary.chiPhiFLsale)}</strong></td>
+    <td><strong>${formatVND(totalCostSummary.chiPhiAFF)}</strong></td>
+    <td><strong>${formatVND(totalCostSummary.tongChiPhi)}</strong></td>
+  `;
+  tbodyCostSummary.appendChild(trTotal);
+
+  // Render bảng chi phí sàn
+  const tbodyPlatformCost = document.querySelector("#platformCostTable tbody");
+  tbodyPlatformCost.innerHTML = "";
+  let totalPlatformCost = {
+    soDonThucTe: 0,
+    phiCoDinh: 0,
+    phiDichVu: 0,
+    phiThanhToan: 0,
+    phiPiShip: 0,
+    tongChiPhiSan: 0
+  };
+
+  for (const shop in platformCost) {
+    const cost = platformCost[shop];
+    const phiPiShip = 1650 * cost.totalOrders;  // Phí Pi Ship = 1650 × tổng số đơn hàng của shop
+    const tongChiPhiSan = cost.phiCoDinh + cost.phiDichVu + cost.phiThanhToan + phiPiShip;
+
+    // Cộng vào tổng
+    totalPlatformCost.soDonThucTe += cost.soDonThucTe;
+    totalPlatformCost.phiCoDinh += cost.phiCoDinh;
+    totalPlatformCost.phiDichVu += cost.phiDichVu;
+    totalPlatformCost.phiThanhToan += cost.phiThanhToan;
+    totalPlatformCost.phiPiShip += phiPiShip;
+    totalPlatformCost.tongChiPhiSan += tongChiPhiSan;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${shop}</td>
+      <td>${cost.soDonThucTe} (Tổng: ${cost.totalOrders})</td>
+      <td>${formatVND(cost.phiCoDinh)}</td>
+      <td>${formatVND(cost.phiDichVu)}</td>
+      <td>${formatVND(cost.phiThanhToan)}</td>
+      <td>${formatVND(phiPiShip)}</td>
+      <td>${formatVND(tongChiPhiSan)}</td>
+    `;
+    tbodyPlatformCost.appendChild(tr);
+  }
+
+  // Thêm dòng tổng
+  const trTotalPlatform = document.createElement("tr");
+  trTotalPlatform.style.fontWeight = "bold";
+  trTotalPlatform.style.backgroundColor = "#f0f0f0";
+  trTotalPlatform.innerHTML = `
+    <td><strong>TỔNG</strong></td>
+    <td><strong>${totalPlatformCost.soDonThucTe}</strong></td>
+    <td><strong>${formatVND(totalPlatformCost.phiCoDinh)}</strong></td>
+    <td><strong>${formatVND(totalPlatformCost.phiDichVu)}</strong></td>
+    <td><strong>${formatVND(totalPlatformCost.phiThanhToan)}</strong></td>
+    <td><strong>${formatVND(totalPlatformCost.phiPiShip)}</strong></td>
+    <td><strong>${formatVND(totalPlatformCost.tongChiPhiSan)}</strong></td>
+  `;
+  tbodyPlatformCost.appendChild(trTotalPlatform);
+}
+
+  // Hàm render bảng Tiktok
+  function renderTiktokTable() {
+    const table = document.getElementById("tiktokSummaryTable");
+    if (!table) return;
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (tiktokOrders.length === 0) {
+      table.style.display = "none";
+      renderTiktokTotalSummaryTable();
+      renderTiktokCostSummaryTable();
+      return;
+    }
+    table.style.display = "table";
+    // Đếm số lần xuất hiện của mỗi Order ID
+    const orderIdCount = {};
+    for (const order of tiktokOrders) {
+      orderIdCount[order.orderId] = (orderIdCount[order.orderId] || 0) + 1;
+    }
+    for (const order of tiktokOrders) {
+      const tr = document.createElement("tr");
+      if (orderIdCount[order.orderId] > 1) {
+        tr.classList.add("duplicate-order");
+      }
+      tr.innerHTML = `
+        <td>${order.shop}</td>
+        <td>${order.orderId}</td>
+        <td>${order.sellerSku}</td>
+        <td>${order.orderStatus}</td>
+        <td>${order.returnType}</td>
+        <td>${formatVND(order.price)}</td>
+        <td>${formatVND(order.tiktokDiscount)}</td>
+        <td>${formatVND(order.shopDiscount)}</td>
+        <td>${formatVND(order.doanhSo)}</td>
+        <td>${order.comboCost ? formatVND(order.comboCost) : ''}</td>
+        <td>${
+          (order.refundAmount > 0 && !normalizeStatus(order.orderStatus).includes('hủy'))
+            ? formatVND(order.refundAmount)
+            : ''
+        }</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    // Tổng hợp theo shop
+    renderTiktokTotalSummaryTable();
+    renderTiktokCostSummaryTable();
+  }
+
+  // Hàm render bảng tổng hợp doanh số Tiktok
+  function renderTiktokTotalSummaryTable() {
+    const table = document.getElementById("tiktokTotalSummaryTable");
+    if (!table) return;
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (tiktokOrders.length === 0) return;
+    // Tổng hợp theo shop
+    const summary = {};
+    for (const order of tiktokOrders) {
+      if (!summary[order.shop]) {
+        summary[order.shop] = {
+          tongDoanhSoDonThat: 0,
+          doanhSoThucTe: 0,
+          doanhSoHuy: 0,
+          doanhSoHoan: 0
+        };
+      }
+      const s = summary[order.shop];
+      // Tổng doanh số đơn thật
+      if (order.loaiDon === "Đơn thật") {
+        s.tongDoanhSoDonThat += order.doanhSo;
+      }
+      // Đơn hợp lệ để tính doanh số thực tế
+      const trangThaiHopLe = ["Đã hoàn tất", "Đã vận chuyển"].includes(order.orderStatus);
+      const isReturn = order.returnType === "Return/Refund";
+      if (order.loaiDon === "Đơn thật" && trangThaiHopLe && !isReturn) {
+        s.doanhSoThucTe += order.doanhSo;
+      }
+      // Đơn Hủy
+      if (order.loaiDon === "Đơn thật" && normalizeStatus(order.orderStatus).includes("hủy")) {
+        s.doanhSoHuy += order.doanhSo;
+      }
+      // Doanh số Đơn Hoàn: chỉ cộng SUM của Order Refund Amount
+      if (
+        order.loaiDon === "Đơn thật" &&
+        order.refundAmount > 0 &&
+        !normalizeStatus(order.orderStatus).includes("hủy")
+      ) {
+        s.doanhSoHoan += order.refundAmount;
+      }
+    }
+    // Render từng shop
+    let total = {
+      tongDoanhSoDonThat: 0,
+      doanhSoThucTe: 0,
+      doanhSoHoanHuy: 0,
+      doanhSoHuy: 0,
+      doanhSoHoan: 0
+    };
+    for (const shop in summary) {
+      const s = summary[shop];
+      const doanhSoHoanHuy = s.doanhSoHuy + s.doanhSoHoan;
+      const tyLeHuy = s.tongDoanhSoDonThat > 0 ? ((s.doanhSoHuy / s.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+      const tyLeHoan = s.tongDoanhSoDonThat > 0 ? ((s.doanhSoHoan / s.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+      total.tongDoanhSoDonThat += s.tongDoanhSoDonThat;
+      total.doanhSoThucTe += s.doanhSoThucTe;
+      total.doanhSoHoanHuy += doanhSoHoanHuy;
+      total.doanhSoHuy += s.doanhSoHuy;
+      total.doanhSoHoan += s.doanhSoHoan;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${shop}</td>
+        <td>${formatVND(s.tongDoanhSoDonThat)}</td>
+        <td>${formatVND(s.doanhSoThucTe)}</td>
+        <td>${formatVND(doanhSoHoanHuy)}</td>
+        <td>${formatVND(s.doanhSoHuy)}</td>
+        <td>${formatVND(s.doanhSoHoan)}</td>
+        <td>${tyLeHuy}%</td>
+        <td>${tyLeHoan}%</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    // Dòng tổng cộng
+    const tyLeHuyTotal = total.tongDoanhSoDonThat > 0 ? ((total.doanhSoHuy / total.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+    const tyLeHoanTotal = total.tongDoanhSoDonThat > 0 ? ((total.doanhSoHoan / total.tongDoanhSoDonThat) * 100).toFixed(2) : "0.00";
+    const doanhSoHoanHuyTotal = total.doanhSoHuy + total.doanhSoHoan;
+    const trTotal = document.createElement("tr");
+    trTotal.style.fontWeight = "bold";
+    trTotal.style.backgroundColor = "#f0f0f0";
+    trTotal.innerHTML = `
+      <td><strong>TỔNG</strong></td>
+      <td><strong>${formatVND(total.tongDoanhSoDonThat)}</strong></td>
+      <td><strong>${formatVND(total.doanhSoThucTe)}</strong></td>
+      <td><strong>${formatVND(doanhSoHoanHuyTotal)}</strong></td>
+      <td><strong>${formatVND(total.doanhSoHuy)}</strong></td>
+      <td><strong>${formatVND(total.doanhSoHoan)}</strong></td>
+      <td><strong>${tyLeHuyTotal}%</strong></td>
+      <td><strong>${tyLeHoanTotal}%</strong></td>
+    `;
+    tbody.appendChild(trTotal);
+  }
+
+  // Xử lý ẩn/hiện menu
+  const sidebar = document.getElementById("sidebar");
+  const toggleBtn = document.getElementById("toggleSidebar");
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.toggle("collapsed");
+    toggleBtn.textContent = sidebar.classList.contains("collapsed") ? "⯈" : "⯇";
+  });
+
+  // Chuyển đổi giữa Shopee, Tiktok, Dashboard
+  const btnShopee = document.getElementById("btnTinhDoanhSoShopee");
+  const btnTiktok = document.getElementById("btnTinhDoanhThuTiktok");
+  const btnDashboardAffTiktok = document.getElementById("btnDashboardAffTiktok");
+  const sectionShopee = document.getElementById("tinhDoanhSoShopeeSection");
+  const sectionTiktok = document.getElementById("tinhDoanhThuTiktokSection");
+  const sectionDashboardAffTiktok = document.getElementById("dashboardAffTiktokSection");
+  btnShopee.addEventListener("click", () => {
+    btnShopee.classList.add("active");
+    btnTiktok.classList.remove("active");
+    btnDashboardAffTiktok.classList.remove("active");
+    sectionShopee.style.display = "block";
+    sectionTiktok.style.display = "none";
+    sectionDashboardAffTiktok.style.display = "none";
+  });
+  btnTiktok.addEventListener("click", () => {
+    btnTiktok.classList.add("active");
+    btnShopee.classList.remove("active");
+    btnDashboardAffTiktok.classList.remove("active");
+    sectionShopee.style.display = "none";
+    sectionTiktok.style.display = "block";
+    sectionDashboardAffTiktok.style.display = "none";
+    renderTiktokTable(); // <-- Thêm dòng này!
+  });
+  btnDashboardAffTiktok.addEventListener("click", () => {
+    btnDashboardAffTiktok.classList.add("active");
+    btnShopee.classList.remove("active");
+    btnTiktok.classList.remove("active");
+    sectionShopee.style.display = "none";
+    sectionTiktok.style.display = "none";
+    sectionDashboardAffTiktok.style.display = "block";
+    renderDashboardAffTiktok();
+  });
+
+  // Hàm render summary cards cho Dashboard AFF Tiktok
+  function renderDashboardAffTiktok() {
+    // Gộp theo nhà sáng tạo
+    const summaryByCreator = {};
+    let totalGMV = 0, totalAffCost = 0, totalOrders = 0, cancelOrders = 0;
+    for (const order of tiktokAffOrders) {
+      const creator = order.tenNhaSangTao || "(Không rõ)";
+      if (!summaryByCreator[creator]) {
+        summaryByCreator[creator] = {
+          gmv: 0,
+          affCost: 0,
+          orders: 0,
+          cancel: 0
+        };
+      }
+      summaryByCreator[creator].gmv += order.coSoHoaHongUocTinh || 0;
+      summaryByCreator[creator].affCost += order.thanhToanTieuChuanUocTinh || 0;
+      summaryByCreator[creator].orders++;
+      if (normalizeStatus(order.trangThaiDonHang).includes("hủy")) {
+        summaryByCreator[creator].cancel++;
+        cancelOrders++;
+      }
+      totalGMV += order.coSoHoaHongUocTinh || 0;
+      totalAffCost += order.thanhToanTieuChuanUocTinh || 0;
+      totalOrders++;
+    }
+    // Render summary cards
+    document.getElementById("dashboardAffTiktokTotalGMV").textContent = formatVND(totalGMV);
+    document.getElementById("dashboardAffTiktokTotalAffCost").textContent = formatVND(totalAffCost);
+    document.getElementById("dashboardAffTiktokTotalOrders").textContent = totalOrders;
+    document.getElementById("dashboardAffTiktokCancelRate").textContent = totalOrders > 0 ? ((cancelOrders / totalOrders * 100).toFixed(2) + "%") : "0%";
+    document.getElementById("dashboardAffTiktokAffGmvRate").textContent = totalGMV > 0 ? ((totalAffCost / totalGMV * 100).toFixed(2) + "%") : "0%";
+
+    // Render bảng tổng hợp theo nhà sáng tạo
+    const tbody = document.querySelector("#dashboardAffTiktokSummaryTable tbody");
+    tbody.innerHTML = "";
+    for (const creator in summaryByCreator) {
+      const s = summaryByCreator[creator];
+      const cancelRate = s.orders > 0 ? ((s.cancel / s.orders) * 100).toFixed(2) + "%" : "0%";
+      const affGmvRate = s.gmv > 0 ? ((s.affCost / s.gmv) * 100).toFixed(2) + "%" : "0%";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${creator}</td>
+        <td>${formatVND(s.gmv)}</td>
+        <td>${formatVND(s.affCost)}</td>
+        <td>${s.orders}</td>
+        <td>${cancelRate}</td>
+        <td>${affGmvRate}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  // Ẩn/hiện bảng tổng hợp
+  const summaryTableContainer = document.getElementById("summaryTableContainer");
+  const toggleSummaryTable = document.getElementById("toggleSummaryTable");
+  toggleSummaryTable.addEventListener("click", () => {
+    if (summaryTableContainer.style.display === "none") {
+      summaryTableContainer.style.display = "block";
+      toggleSummaryTable.textContent = "▼";
+    } else {
+      summaryTableContainer.style.display = "none";
+      toggleSummaryTable.textContent = "▲";
+    }
+  });
+
+  // Ẩn/hiện bảng đơn hàng
+  const ordersTableContainer = document.getElementById("ordersTableContainer");
+  const ordersTableFilterBar = document.getElementById("ordersTableFilterBar");
+  const toggleOrdersTable = document.getElementById("toggleOrdersTable");
+  toggleOrdersTable.addEventListener("click", () => {
+    if (ordersTableContainer.style.display === "none") {
+      ordersTableContainer.style.display = "block";
+      ordersTableFilterBar.style.display = "block";
+      toggleOrdersTable.textContent = "▼";
+    } else {
+      ordersTableContainer.style.display = "none";
+      ordersTableFilterBar.style.display = "none";
+      toggleOrdersTable.textContent = "▲";
+    }
+  });
+
+  // Ẩn/hiện bảng chi phí sàn
+  const platformCostTableContainer = document.getElementById("platformCostTableContainer");
+  const togglePlatformCostTable = document.getElementById("togglePlatformCostTable");
+  togglePlatformCostTable.addEventListener("click", () => {
+    if (platformCostTableContainer.style.display === "none") {
+      platformCostTableContainer.style.display = "block";
+      togglePlatformCostTable.textContent = "▼";
+    } else {
+      platformCostTableContainer.style.display = "none";
+      togglePlatformCostTable.textContent = "▲";
+    }
+  });
+
+  // Ẩn/hiện bảng chi phí tổng hợp
+  const costSummaryTableContainer = document.getElementById("costSummaryTableContainer");
+  const toggleCostSummaryTable = document.getElementById("toggleCostSummaryTable");
+  toggleCostSummaryTable.addEventListener("click", () => {
+    if (costSummaryTableContainer.style.display === "none") {
+      costSummaryTableContainer.style.display = "block";
+      toggleCostSummaryTable.textContent = "▼";
+    } else {
+      costSummaryTableContainer.style.display = "none";
+      toggleCostSummaryTable.textContent = "▲";
+    }
+  });
+
+  // Sự kiện filter Giá ưu đãi
+  document.getElementById("giaUuDaiFilter").addEventListener("change", renderTables);
+
+  // Sự kiện nhập Chi phí FLsale
+  document.getElementById("ordersTable").addEventListener("input", function(e) {
+    if (e.target.classList.contains("flsale-input")) {
+      const maDon = e.target.getAttribute("data-madon");
+      flSaleCosts.set(maDon, Number(e.target.value));
+    }
+  });
+
+  // Sự kiện lưu Chi phí FLsale
+  document.getElementById("saveFlSaleBtn").addEventListener("click", function() {
+    let count = 0;
+    for (const [maDon, cost] of flSaleCosts.entries()) {
+      if (dataOrders.has(maDon)) {
+        dataOrders.get(maDon).flSaleCost = cost;
+        count++;
+      }
+    }
+    flSaleCosts.clear();
+    renderTables();
+    showToast(`Đã lưu ${count} Chi phí FLsale!`, "success");
+  });
+
+  // Sự kiện áp dụng hàng loạt
+  document.getElementById("applyBatchFlSaleBtn").addEventListener("click", function() {
+    const value = Number(document.getElementById("batchFlSaleInput").value);
+    if (isNaN(value) || value < 0) {
+      showToast("Vui lòng nhập số hợp lệ cho Chi phí FLsale!", "error");
+      return;
+    }
+    let count = 0;
+    document.querySelectorAll(".order-checkbox:checked").forEach(cb => {
+      const maDon = cb.getAttribute("data-madon");
+      if (dataOrders.has(maDon)) {
+        dataOrders.get(maDon).flSaleCost = value;
+        count++;
+      }
+    });
+    renderTables();
+    showToast(`Đã áp dụng cho ${count} đơn hàng!`, "success");
+  });
+
+  // Sự kiện tìm kiếm từng cột
+  document.getElementById("ordersTableSearchRow").addEventListener("input", function(e) {
+    if (e.target.classList.contains("search-col")) {
+      const col = e.target.getAttribute("data-col");
+      ordersTableColFilters[col] = e.target.value.trim().toLowerCase();
+      renderTables();
+    }
+  });
+
+  // Hàm lấy chi phí combo ghép từ SKU phân loại hàng
+  function getBundledProductCost(sku) {
+    if (!sku) return 0;
+    // Tìm pattern COMBO/.../số
+    const comboMatch = sku.match(/COMBO[\/\w-]*\/(\d+)$/i);
+    if (comboMatch && comboMatch[1]) {
+      return Number(comboMatch[1]);
+    }
+    // Tìm pattern COMBO/.../số ở cuối
+    const lastNum = sku.match(/\/(\d+)$/);
+    if (lastNum) return Number(lastNum[1]);
+    return 0;
+  }
+
+  // Sự kiện checkbox tất cả
+  document.getElementById("selectAllOrders").addEventListener("change", function(e) {
+    const checked = e.target.checked;
+    document.querySelectorAll(".order-checkbox").forEach(cb => { cb.checked = checked; });
+  });
+
+  // Sự kiện debug
+  document.getElementById("debugBtn").addEventListener("click", function() {
+    console.log("=== DEBUG INFO ===");
+    console.log(`Tổng số đơn hàng: ${dataOrders.size}`);
+    console.log(`Tổng số đơn AFF: ${affOrders.length}`);
+
+    // Thống kê theo shop
+    const shopStats = {};
+    for (const order of dataOrders.values()) {
+      if (!shopStats[order.shop]) {
+        shopStats[order.shop] = {
+          total: 0,
+          donThat: 0,
+          donAo: 0,
+          trangThaiHopLe: 0,
+          biHoanTra: 0
+        };
+      }
+      shopStats[order.shop].total++;
+
+      if (order.loaiDon === "Đơn thật") {
+        shopStats[order.shop].donThat++;
+      } else {
+        shopStats[order.shop].donAo++;
+      }
+
+      const trangThaiHopLe = validOrderStatuses.includes(order.trangThai) || regexConfirmedReceived.test(order.trangThai);
+      const isTraHangHoanTien = rejectReturnStatuses.includes(order.trangThaiTraHangHoanTien);
+
+      if (trangThaiHopLe) {
+        shopStats[order.shop].trangThaiHopLe++;
+      }
+      if (isTraHangHoanTien) {
+        shopStats[order.shop].biHoanTra++;
+      }
+    }
+
+    console.log("Thống kê theo shop:");
+    for (const shop in shopStats) {
+      const stats = shopStats[shop];
+      console.log(`${shop}: Tổng ${stats.total}, Đơn thật ${stats.donThat}, Đơn ảo ${stats.donAo}, Trạng thái hợp lệ ${stats.trangThaiHopLe}, Bị hoàn trả ${stats.biHoanTra}`);
+    }
+
+    // Hiển thị toast với thông tin tổng quan
+    const totalOrders = dataOrders.size;
+    const totalAff = affOrders.length;
+    showToast(`Debug: ${totalOrders} đơn hàng, ${totalAff} đơn AFF. Xem Console để biết chi tiết.`, "success");
+  });
+
+  // Sự kiện debug AFF
+  document.getElementById("debugAffBtn").addEventListener("click", function() {
+    console.log("=== DEBUG AFF DETAILED ===");
+    console.log(`Tổng số đơn AFF: ${affOrders.length}`);
+    
+    if (affOrders.length === 0) {
+      console.log("Chưa có dữ liệu AFF nào!");
+      showToast("Chưa có dữ liệu AFF. Vui lòng import file AFF trước!", "error");
+      return;
+    }
+    
+    // In ra chi tiết từng đơn AFF
+    for (let i = 0; i < affOrders.length; i++) {
+      const aff = affOrders[i];
+      console.log(`AFF ${i + 1}:`);
+      console.log(`  - Mã đơn: ${aff.maDonHang}`);
+      console.log(`  - Shop: ${aff.shop}`);
+      console.log(`  - Chi phí: ${aff.chiPhi}`);
+      console.log(`  - Trạng thái khấu trừ: ${aff.trangThaiKhauTru}`);
+      console.log(`  - Tài khoản TTLK: ${aff.taiKhoanTTLK}`);
+      
+      // Kiểm tra xem có đơn hàng tương ứng không
+      const correspondingOrder = dataOrders.get(aff.maDonHang);
+      if (correspondingOrder) {
+        console.log(`  - Tìm thấy đơn hàng tương ứng:`);
+        console.log(`    + Trạng thái: ${correspondingOrder.trangThai}`);
+        console.log(`    + Loại đơn: ${correspondingOrder.loaiDon}`);
+        console.log(`    + Trạng thái hoàn trả: ${correspondingOrder.trangThaiTraHangHoanTien}`);
+        
+        const trangThaiHopLe = validOrderStatuses.includes(correspondingOrder.trangThai) || regexConfirmedReceived.test(correspondingOrder.trangThai);
+        const isTraHangHoanTien = rejectReturnStatuses.includes(correspondingOrder.trangThaiTraHangHoanTien);
+        const isDonAo = correspondingOrder.loaiDon === "Đơn ảo";
+        const isOrderRejected = isDonAo || !trangThaiHopLe || isTraHangHoanTien;
+        
+        console.log(`    + Trạng thái hợp lệ: ${trangThaiHopLe}`);
+        console.log(`    + Bị hoàn trả: ${isTraHangHoanTien}`);
+        console.log(`    + Đơn ảo: ${isDonAo}`);
+        console.log(`    + Bị loại bỏ: ${isOrderRejected}`);
+      } else {
+        console.log(`  - KHÔNG TÌM THẤY đơn hàng tương ứng trong dataOrders`);
+      }
+      console.log("---");
+    }
+    
+    // Tính tổng chi phí AFF
+    let totalChiPhi = 0;
+    for (const aff of affOrders) {
+      totalChiPhi += aff.chiPhi;
+    }
+    console.log(`Tổng chi phí AFF: ${totalChiPhi}`);
+    
+    showToast(`Debug AFF: ${affOrders.length} đơn, Tổng chi phí: ${totalChiPhi}. Xem Console để biết chi tiết.`, "success");
+  });
+
+  function normalizeStatus(str) {
+    return (str || '').toLowerCase().replace(/đã h[ủy|uỷ]/g, 'đã hủy').trim();
+  }
+
+  // Hàm lấy chi phí combo ghép từ Seller SKU (giống Shopee)
+  function getBundledProductCostTiktok(sku) {
+    if (!sku) return 0;
+
+    // Kiểm tra nếu Seller SKU chứa từ COMBO
+    if (sku.includes("COMBO")) {
+      // Lấy số tiền dựa vào dữ liệu lấy nằm bên tay phải của dấu / cuối cùng
+      const lastSlashIndex = sku.lastIndexOf('/');
+      if (lastSlashIndex !== -1 && lastSlashIndex < sku.length - 1) {
+        const valueAfterLastSlash = sku.substring(lastSlashIndex + 1);
+        if (!isNaN(valueAfterLastSlash)) {
+          return Number(valueAfterLastSlash);
+        }
+      }
+    }
+
+    return 0;
+  }
+
+  // --- Biến lưu trữ dữ liệu AFF Tiktok ---
+  let tiktokAffOrders = [];
+
+  // Xử lý import file AFF Tiktok
+  document.getElementById("importAffBtnTiktok").addEventListener("click", () => {
+    const affFileInput = document.getElementById("affFileInputTiktok");
+    if (!affFileInput.files.length) {
+      showToast("Vui lòng chọn file AFF Tiktok để import!", "error");
+      return;
+    }
+    const file = affFileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:"array"});
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+        tiktokAffOrders = [];
+        for (const row of jsonData) {
+          const tenNhaSangTao = String(row["Tên người dùng nhà sáng tạo"] || row["Tên nhà sáng tạo"] || "").trim();
+          const loaiNoiDung = String(row["Loại nội dung"] || "").trim();
+          const sellerSku = String(row["Seller SKU"] || row["SKU người bán"] || row["SellerSku"] || "").trim();
+          const coSoHoaHongUocTinh = parseFloat(row["Cơ sở hoa hồng ước tính"] || 0);
+          const thanhToanTieuChuanUocTinh = parseFloat(row["Thanh toán hoa hồng tiêu chuẩn ước tính"] || 0);
+          const thanhToanQCCTUocTinh = parseFloat(row["Thanh toán hoa hồng Quảng cáo cửa hàng ước tính"] || 0);
+          const trangThaiDonHang = String(row["Trạng thái đơn hàng"] || "").trim();
+          // Chi phí AFF
+          let chiPhiAFF = 0;
+          if (!normalizeStatus(trangThaiDonHang).includes("hủy")) {
+            chiPhiAFF = thanhToanTieuChuanUocTinh + thanhToanQCCTUocTinh;
+          }
+          tiktokAffOrders.push({
+            tenNhaSangTao,
+            loaiNoiDung,
+            sellerSku,
+            coSoHoaHongUocTinh,
+            thanhToanTieuChuanUocTinh,
+            thanhToanQCCTUocTinh,
+            chiPhiAFF,
+            trangThaiDonHang
+          });
+        }
+        renderTiktokAffTable();
+        showToast(`Import AFF Tiktok thành công: ${tiktokAffOrders.length} dòng`, "success");
+        affFileInput.value = "";
+        // Gọi lại renderTiktokCostSummaryTable để cập nhật bảng tổng hợp chi phí Tiktok
+        renderTiktokCostSummaryTable();
+      } catch (err) {
+        console.error(err);
+        showToast("Lỗi khi đọc file AFF Tiktok. Vui lòng kiểm tra file và thử lại.", "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Hàm render bảng AFF Tiktok
+  function renderTiktokAffTable() {
+    const tbody = document.querySelector("#tiktokAffTable tbody");
+    tbody.innerHTML = "";
+    for (const order of tiktokAffOrders) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${order.tenNhaSangTao}</td>
+        <td>${order.loaiNoiDung}</td>
+        <td>${order.sellerSku}</td>
+        <td>${formatVND(order.coSoHoaHongUocTinh)}</td>
+        <td>${formatVND(order.thanhToanTieuChuanUocTinh)}</td>
+        <td>${formatVND(order.thanhToanQCCTUocTinh)}</td>
+        <td>${formatVND(order.chiPhiAFF)}</td>
+        <td>${order.trangThaiDonHang}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    renderDashboardAffTiktok();
+  }
+
+  // Dashboard Affiliate Tiktok
+  function renderTiktokAffDashboard() {
+    const tbody = document.querySelector("#tiktokAffDashboardTable tbody");
+    tbody.innerHTML = "";
+    for (const order of tiktokAffOrders) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${order.tenNhaSangTao}</td>
+        <td>${order.loaiNoiDung}</td>
+        <td>${order.sellerSku}</td>
+        <td>${formatVND(order.coSoHoaHongUocTinh)}</td>
+        <td>${formatVND(order.thanhToanTieuChuanUocTinh)}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderTiktokCostSummaryTable() {
+    const table = document.getElementById("tiktokCostSummaryTable");
+    if (!table) return;
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    // Kiểm tra xem đã import dữ liệu chưa
+    // Nếu chưa import dữ liệu thì không hiển thị thông tin shop
+    if (tiktokOrders.length === 0 && tiktokAffOrders.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td colspan="3" style="text-align: center;"><em>Chưa có dữ liệu. Vui lòng import dữ liệu trước.</em></td>
+      `;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    // Lấy shop đang chọn, nếu không có dữ liệu thì mặc định chọn shop đầu tiên
+    let selectedShop = document.getElementById("shopSelectTiktok").value;
+    if (!selectedShop && document.getElementById("shopSelectTiktok").options.length > 0) {
+      selectedShop = document.getElementById("shopSelectTiktok").options[0].value;
+      document.getElementById("shopSelectTiktok").value = selectedShop;
+    }
+    // Tổng chi phí Combo ghép của shop đang chọn (chỉ cho đơn hàng không bị loại bỏ)
+    let totalCombo = 0;
+    for (const order of tiktokOrders) {
+      if (order.shop === selectedShop) {
+        // Kiểm tra trạng thái đơn hàng có bị loại bỏ hay không
+        const trangThaiHopLe = ["Đã hoàn tất", "Đã vận chuyển"].includes(order.orderStatus);
+        const isReturn = order.returnType === "Return/Refund";
+        const isDonAo = order.loaiDon === "Đơn ảo";
+        const isOrderRejected = isDonAo || !trangThaiHopLe || isReturn;
+        
+        // Chỉ cộng chi phí combo nếu đơn hàng không bị loại bỏ
+        if (!isOrderRejected) {
+          totalCombo += order.comboCost || 0;
+        }
+      }
+    }
+    // Tổng chi phí AFF của shop đang chọn (chỉ cho đơn hàng không bị loại bỏ)
+    let totalAff = 0;
+    for (const aff of tiktokAffOrders) {
+      // Kiểm tra trạng thái đơn hàng AFF có bị loại bỏ hay không
+      const isAffOrderRejected = normalizeStatus(aff.trangThaiDonHang).includes("hủy");
+      
+      if (!isAffOrderRejected) {
+        if (aff.tenNhaSangTao && aff.shop && aff.shop === selectedShop) {
+          totalAff += aff.chiPhiAFF || 0;
+        } else if (!aff.shop && selectedShop) {
+          // Nếu dữ liệu AFF không có trường shop, vẫn cộng hết (giữ logic cũ)
+          totalAff += aff.chiPhiAFF || 0;
+        }
+      }
+    }
+    // Hiển thị 1 dòng cho shop đang chọn
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${selectedShop}</strong></td>
+      <td><strong>${formatVND(totalCombo)}</strong></td>
+      <td><strong>${formatVND(totalAff)}</strong></td>
+    `;
+    tbody.appendChild(tr);
+    // Thêm dòng tổng cộng cho tất cả các shop (chỉ cho đơn hàng không bị loại bỏ)
+    let grandTotalCombo = 0;
+    for (const order of tiktokOrders) {
+      // Kiểm tra trạng thái đơn hàng có bị loại bỏ hay không
+      const trangThaiHopLe = ["Đã hoàn tất", "Đã vận chuyển"].includes(order.orderStatus);
+      const isReturn = order.returnType === "Return/Refund";
+      const isDonAo = order.loaiDon === "Đơn ảo";
+      const isOrderRejected = isDonAo || !trangThaiHopLe || isReturn;
+      
+      // Chỉ cộng chi phí combo nếu đơn hàng không bị loại bỏ
+      if (!isOrderRejected) {
+        grandTotalCombo += order.comboCost || 0;
+      }
+    }
+    let grandTotalAff = 0;
+    for (const aff of tiktokAffOrders) {
+      // Kiểm tra trạng thái đơn hàng AFF có bị loại bỏ hay không
+      const isAffOrderRejected = normalizeStatus(aff.trangThaiDonHang).includes("hủy");
+      
+      // Chỉ cộng chi phí AFF nếu đơn hàng không bị loại bỏ
+      if (!isAffOrderRejected) {
+        grandTotalAff += aff.chiPhiAFF || 0;
+      }
+    }
+    const trTotal = document.createElement("tr");
+    trTotal.style.fontWeight = "bold";
+    trTotal.style.backgroundColor = "#f0f0f0";
+    trTotal.innerHTML = `
+      <td><strong>TỔNG</strong></td>
+      <td><strong>${formatVND(grandTotalCombo)}</strong></td>
+      <td><strong>${formatVND(grandTotalAff)}</strong></td>
+    `;
+    tbody.appendChild(trTotal);
+  }
+
+  // Gọi lại renderTiktokCostSummaryTable khi thay đổi shop
+  const shopSelectTiktok = document.getElementById("shopSelectTiktok");
+  if (shopSelectTiktok) {
+    shopSelectTiktok.addEventListener("change", function() {
+      // Không render lại bảng chi phí tổng hợp khi chỉ chọn shop
+      // renderTiktokCostSummaryTable(); // Dòng này bị loại bỏ để tránh update không mong muốn
+    });
+  }
+
+</script>
+</body>
+</html>
